@@ -1,0 +1,217 @@
+"""
+AI-Powered Agentic Honey-Pot System
+Main API endpoint for receiving and processing scam messages
+"""
+
+from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+import uvicorn
+from datetime import datetime
+import json
+
+from scam_detector import ScamDetector
+from agent_engine import AgentEngine
+from intelligence_extractor import IntelligenceExtractor
+from config import API_KEY
+
+app = FastAPI(title="Agentic Honey-Pot API")
+
+# Enable CORS for web interface
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify exact origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize components
+scam_detector = ScamDetector()
+agent_engine = AgentEngine()
+intelligence_extractor = IntelligenceExtractor()
+
+# Store conversation history (in production, use Redis/Database)
+conversation_store: Dict[str, List[Dict]] = {}
+
+
+class Message(BaseModel):
+    conversation_id: str
+    sender: str  # "user" or "scammer"
+    message: str
+    timestamp: Optional[str] = None
+
+
+class IncomingRequest(BaseModel):
+    conversation_id: str
+    message: str
+    history: Optional[List[Dict]] = []
+
+
+class ResponseOutput(BaseModel):
+    conversation_id: str
+    scam_detected: bool
+    agent_activated: bool
+    response_message: str
+    extracted_intelligence: Dict[str, Any]
+    engagement_metrics: Dict[str, Any]
+    confidence_score: float
+
+
+def verify_api_key(x_api_key: str = Header(...)):
+    """Verify API key from header"""
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+    return x_api_key
+
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    return {
+        "status": "online",
+        "service": "Agentic Honey-Pot API",
+        "version": "1.0.0"
+    }
+
+
+@app.post("/detect", response_model=ResponseOutput)
+async def detect_and_engage(
+    request: IncomingRequest,
+    x_api_key: str = Header(..., alias="X-API-Key")
+):
+    """
+    Main endpoint to receive messages, detect scams, and engage scammers
+    """
+    # Verify API key
+    verify_api_key(x_api_key)
+    
+    conversation_id = request.conversation_id
+    incoming_message = request.message
+    history = request.history or []
+    
+    # Store/update conversation history
+    if conversation_id not in conversation_store:
+        conversation_store[conversation_id] = []
+    
+    conversation_store[conversation_id].append({
+        "role": "scammer",
+        "content": incoming_message,
+        "timestamp": datetime.now().isoformat()
+    })
+    
+    # Get full conversation context
+    full_history = conversation_store[conversation_id]
+    
+    # Step 1: Detect scam intent
+    scam_result = await scam_detector.analyze(incoming_message, full_history)
+    
+    scam_detected = scam_result["is_scam"]
+    confidence = scam_result["confidence"]
+    scam_type = scam_result.get("scam_type", "unknown")
+    
+    # Step 2: Generate response
+    if scam_detected and confidence > 0.6:
+        # Activate agent for engagement
+        agent_response = await agent_engine.generate_response(
+            message=incoming_message,
+            history=full_history,
+            scam_type=scam_type,
+            conversation_id=conversation_id
+        )
+        
+        response_message = agent_response["message"]
+        agent_activated = True
+        
+        # Store agent response
+        conversation_store[conversation_id].append({
+            "role": "agent",
+            "content": response_message,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    else:
+        # Not confident it's a scam - probe gently
+        response_message = agent_engine.generate_neutral_probe(incoming_message)
+        agent_activated = False
+        
+        conversation_store[conversation_id].append({
+            "role": "agent",
+            "content": response_message,
+            "timestamp": datetime.now().isoformat()
+        })
+    
+    # Step 3: Extract intelligence from conversation
+    extracted_intel = intelligence_extractor.extract(
+        full_history,
+        incoming_message
+    )
+    
+    # Step 4: Calculate engagement metrics
+    engagement_metrics = {
+        "total_turns": len(full_history),
+        "agent_turns": len([m for m in full_history if m.get("role") == "agent"]),
+        "conversation_duration_seconds": calculate_duration(full_history),
+        "intelligence_items_found": len([v for v in extracted_intel.values() if v])
+    }
+    
+    # Return structured response
+    return ResponseOutput(
+        conversation_id=conversation_id,
+        scam_detected=scam_detected,
+        agent_activated=agent_activated,
+        response_message=response_message,
+        extracted_intelligence=extracted_intel,
+        engagement_metrics=engagement_metrics,
+        confidence_score=confidence
+    )
+
+
+def calculate_duration(history: List[Dict]) -> int:
+    """Calculate conversation duration in seconds"""
+    if len(history) < 2:
+        return 0
+    
+    try:
+        first = datetime.fromisoformat(history[0]["timestamp"])
+        last = datetime.fromisoformat(history[-1]["timestamp"])
+        return int((last - first).total_seconds())
+    except:
+        return 0
+
+
+@app.get("/conversation/{conversation_id}")
+async def get_conversation(
+    conversation_id: str,
+    x_api_key: str = Header(..., alias="X-API-Key")
+):
+    """Retrieve conversation history"""
+    verify_api_key(x_api_key)
+    
+    if conversation_id not in conversation_store:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    return {
+        "conversation_id": conversation_id,
+        "history": conversation_store[conversation_id]
+    }
+
+
+@app.delete("/conversation/{conversation_id}")
+async def delete_conversation(
+    conversation_id: str,
+    x_api_key: str = Header(..., alias="X-API-Key")
+):
+    """Delete conversation history"""
+    verify_api_key(x_api_key)
+    
+    if conversation_id in conversation_store:
+        del conversation_store[conversation_id]
+        return {"status": "deleted", "conversation_id": conversation_id}
+    
+    raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
