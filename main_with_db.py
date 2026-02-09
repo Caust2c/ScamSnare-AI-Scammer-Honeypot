@@ -15,7 +15,7 @@ from scam_detector import ScamDetector
 from agent_engine import AgentEngine
 from intelligence_extractor import IntelligenceExtractor
 from intelligence_db import IntelligenceDB
-from config import API_KEY
+from config.py import API_KEY
 
 app = FastAPI(title="Agentic Honey-Pot API")
 

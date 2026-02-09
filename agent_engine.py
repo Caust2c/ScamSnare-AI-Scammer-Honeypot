@@ -1,5 +1,6 @@
 """
-Agent Engine - Manages believable persona and engagement strategy
+Agent Engine - AI-Driven Believable Victim Persona
+Gives the LLM full control to naturally engage with scammers
 """
 
 import requests
@@ -13,45 +14,21 @@ class AgentEngine:
         self.ollama_url = ollama_url
         self.model = "llama3.2:3b"
         
-        # Persona templates for believable responses
-        self.personas = {
-            "curious_victim": {
-                "traits": "Curious, slightly naive, asks questions, shows interest",
-                "tone": "friendly and trusting",
-                "strategy": "Show interest but ask for clarification to extract details"
-            },
-            "eager_victim": {
-                "traits": "Excited about offers, eager to help, wants to comply quickly",
-                "tone": "enthusiastic and cooperative",
-                "strategy": "Express eagerness while asking how to proceed"
-            },
-            "concerned_victim": {
-                "traits": "Worried about the situation, wants to resolve issues",
-                "tone": "anxious but compliant",
-                "strategy": "Show concern and ask for detailed instructions"
-            },
-            "elderly_victim": {
-                "traits": "Not tech-savvy, asks basic questions, needs help",
-                "tone": "polite and uncertain",
-                "strategy": "Express confusion and ask for step-by-step guidance"
-            }
+        # Core victim personality (consistent across conversation)
+        self.victim_profile = {
+            "name": "Rajesh Kumar",
+            "age": "45",
+            "occupation": "small business owner",
+            "tech_savvy": "moderate - uses phone but not expert",
+            "personality": "trusting, curious, somewhat naive about scams",
+            "concerns": "wants to help, worried about missing opportunities"
         }
         
-        # Conversation stage tracking
-        self.conversation_stages = {
-            1: "initial_contact",
-            2: "building_trust",
-            3: "information_gathering",
-            4: "extraction_phase"
-        }
-        
-        # Neutral probing responses
-        self.neutral_probes = [
-            "Could you tell me more about this?",
-            "I'm not sure I understand. Can you explain?",
-            "Is this something urgent?",
-            "What do you need from me exactly?",
-            "How did you get my number?",
+        # Fallback responses only if LLM completely fails
+        self.emergency_fallbacks = [
+            "I'm not sure I understand. Can you explain more?",
+            "Okay, what should I do next?",
+            "That sounds important. Tell me more about this.",
         ]
     
     async def generate_response(
@@ -61,111 +38,74 @@ class AgentEngine:
         scam_type: str,
         conversation_id: str
     ) -> Dict:
-        """Generate believable agent response to engage scammer"""
+        """Generate natural, AI-driven response to engage scammer"""
         
-        # Determine conversation stage
-        stage = self._get_conversation_stage(history)
-        
-        # Select appropriate persona based on scam type
-        persona = self._select_persona(scam_type, stage)
-        
-        # Generate contextual response using LLM
-        response = await self._generate_llm_response(
-            message, history, persona, scam_type, stage
-        )
+        # Let AI analyze the conversation and respond naturally
+        response = await self._generate_ai_response(message, history, scam_type)
         
         return {
             "message": response,
-            "persona": persona,
-            "stage": stage,
             "conversation_id": conversation_id
         }
     
     def generate_neutral_probe(self, message: str) -> str:
-        """Generate neutral probing question when scam is uncertain"""
-        # Add some randomness to appear natural
-        return random.choice(self.neutral_probes)
+        """Generate neutral response when scam is uncertain"""
+        return random.choice([
+            "Could you tell me more about this?",
+            "I'm not sure I understand. Can you explain?",
+            "What do you need from me exactly?",
+        ])
     
-    def _get_conversation_stage(self, history: List[Dict]) -> int:
-        """Determine current conversation stage"""
-        agent_turns = len([m for m in history if m.get("role") == "agent"])
-        
-        if agent_turns <= 1:
-            return 1  # initial_contact
-        elif agent_turns <= 3:
-            return 2  # building_trust
-        elif agent_turns <= 6:
-            return 3  # information_gathering
-        else:
-            return 4  # extraction_phase
-    
-    def _select_persona(self, scam_type: str, stage: int) -> str:
-        """Select appropriate persona based on scam type and stage"""
-        
-        # Match persona to scam type
-        if scam_type in ["upi_scam", "financial_fraud"]:
-            if stage <= 2:
-                return "curious_victim"
-            else:
-                return "eager_victim"
-        
-        elif scam_type == "phishing":
-            return "concerned_victim"
-        
-        elif scam_type == "impersonation":
-            if stage <= 2:
-                return "concerned_victim"
-            else:
-                return "elderly_victim"
-        
-        else:
-            return "curious_victim"
-    
-    async def _generate_llm_response(
+    async def _generate_ai_response(
         self,
         message: str,
         history: List[Dict],
-        persona: str,
-        scam_type: str,
-        stage: int
+        scam_type: str
     ) -> str:
-        """Generate response using Ollama LLM with persona"""
+        """Let the AI generate a completely natural response"""
         
-        persona_info = self.personas[persona]
-        stage_name = self.conversation_stages[stage]
+        # Build full conversation context
+        context = self._build_full_context(history)
         
-        # Build conversation context
-        context = self._build_history_context(history[-4:])  # Last 4 messages
+        # Count turns for stage awareness
+        turn_count = len([m for m in history if m.get("role") == "agent"])
         
-        prompt = f"""You are playing the role of a victim in a scam honeypot system. Your goal is to appear as a believable victim while subtly extracting information from the scammer.
+        # Create a natural, comprehensive prompt
+        prompt = f"""You are {self.victim_profile['name']}, a {self.victim_profile['age']}-year-old {self.victim_profile['occupation']} in India. You are {self.victim_profile['tech_savvy']}.
 
-PERSONA: {persona}
-- Traits: {persona_info['traits']}
-- Tone: {persona_info['tone']}
-- Strategy: {persona_info['strategy']}
+PERSONALITY: {self.victim_profile['personality']}
 
-CONVERSATION STAGE: {stage_name}
-SCAM TYPE: {scam_type}
+You are having a conversation with someone who contacted you. Your conversation so far:
 
-CONVERSATION CONTEXT:
 {context}
 
-SCAMMER'S LATEST MESSAGE:
+THEIR LATEST MESSAGE:
 "{message}"
 
-OBJECTIVES FOR THIS RESPONSE:
-{self._get_stage_objectives(stage, scam_type)}
+YOUR GOAL:
+- Not everyone is a scammer, if someone is talking naturally continue the talk do not limit to responses such as 'what do you need from me?' that sounds and is rude. Continue chat normally unless financial help or general talk is said.
+- Respond naturally as yourself (Rajesh)
+- Be believable - act like a real person would
+- If something sounds suspicious, be curious but don't accuse them
+- If they're offering something, show interest and ask how it works
+- If they need information, ask WHY they need it and WHAT they'll do with it
+- Try to get THEIR details (account numbers, UPI IDs, phone numbers, website links, company name)
+- Keep your response natural and conversational (2-4 sentences)
+- Never give real bank details - deflect with questions instead
+- Show appropriate emotions (excitement for prizes, concern for problems, confusion for complex things)
 
-IMPORTANT RULES:
-1. Stay in character as the victim
-2. Never reveal you know it's a scam
-3. Ask questions that extract specific details (bank names, account numbers, UPI IDs, links, phone numbers)
-4. Show appropriate emotion (curiosity, concern, eagerness)
-5. Keep responses natural and conversational (1-3 sentences)
-6. If they ask for sensitive info, show hesitation but ask "why do you need this?" or "what will you do with it?"
-7. Never give actual bank details - deflect or ask questions instead
+CONVERSATION STAGE: Turn {turn_count + 1}
+- Early conversation (1-3 turns): Be curious, ask who they are, why they're contacting you
+- Mid conversation (4-7 turns): Show interest, ask for details about the process
+- Later conversation (8+ turns): Ask for their specific details (accounts, UPIs, links, addresses)
 
-Generate ONLY the victim's response (no explanations or meta-commentary):"""
+IMPORTANT: 
+- Stay in character as Rajesh
+- Never break character or reveal this is a honeypot
+- Be natural - real people aren't perfect, they ask questions, show emotion
+- If they ask for your bank account, say something like "I have multiple accounts, which one should I use? What's your account number so I can verify?"
+
+Respond ONLY as Rajesh (no explanations, no meta-commentary, just your natural response):"""
 
         try:
             response = requests.post(
@@ -174,102 +114,122 @@ Generate ONLY the victim's response (no explanations or meta-commentary):"""
                     "model": self.model,
                     "prompt": prompt,
                     "stream": False,
-                    "temperature": 0.7,  # Higher for natural variation
+                    "temperature": 0.8,  # Higher for more natural variation
+                    "top_p": 0.9,
                     "options": {
-                        "num_predict": 100
+                        "num_predict": 150,  # Allow longer, more natural responses
+                        "stop": ["\n\n", "Scammer:", "You:", "Assistant:", "Response:"]
                     }
                 },
-                timeout=15
+                timeout=20
             )
             
             if response.status_code == 200:
                 result = response.json()
                 generated_text = result.get("response", "").strip()
                 
-                # Clean up response
-                cleaned = self._clean_response(generated_text)
+                # Minimal cleaning - let AI be more natural
+                cleaned = self._minimal_clean(generated_text)
                 
-                # Fallback if response is too long or weird
-                if len(cleaned) > 200 or not cleaned:
-                    return self._fallback_response(persona, stage, message)
+                # Only fallback if response is empty or way too long
+                if not cleaned or len(cleaned) > 300:
+                    return self._smart_fallback(message, turn_count)
                 
                 return cleaned
         
         except Exception as e:
             print(f"LLM generation error: {e}")
-            return self._fallback_response(persona, stage, message)
+            return self._smart_fallback(message, turn_count)
     
-    def _build_history_context(self, history: List[Dict]) -> str:
-        """Build conversation history context"""
+    def _build_full_context(self, history: List[Dict]) -> str:
+        """Build complete conversation history for AI"""
         if not history:
-            return "No previous conversation"
+            return "This is the start of the conversation."
         
         lines = []
         for msg in history:
-            role = "You" if msg.get("role") == "agent" else "Scammer"
+            role = "You (Rajesh)" if msg.get("role") == "agent" else "Them"
             content = msg.get("content", "")
             lines.append(f"{role}: {content}")
         
         return "\n".join(lines)
     
-    def _get_stage_objectives(self, stage: int, scam_type: str) -> str:
-        """Get objectives for current conversation stage"""
-        objectives = {
-            1: "- Show curiosity\n- Ask who they are\n- Ask why they're contacting you",
-            2: "- Express interest or concern\n- Ask for more details about their offer/claim\n- Probe for company name, official details",
-            3: "- Ask how the process works\n- Request specific steps\n- Ask about account numbers, UPI IDs they'll use\n- Show willingness but seek clarity",
-            4: "- Extract maximum details (full account numbers, exact UPI IDs, links)\n- Show readiness to proceed\n- Ask 'what happens next?' to get more info"
-        }
-        
-        base = objectives.get(stage, objectives[1])
-        
-        # Add scam-type specific objectives
-        if scam_type == "upi_scam" and stage >= 3:
-            base += "\n- Ask: 'Which UPI ID should I send to?'\n- Ask: 'What's your UPI ID?'"
-        elif scam_type == "phishing" and stage >= 2:
-            base += "\n- Ask for the link again\n- Ask what the link will do"
-        
-        return base
-    
-    def _clean_response(self, text: str) -> str:
-        """Clean up LLM generated response"""
-        # Remove common artifacts
-        text = re.sub(r'^(Response:|Victim:|You:)\s*', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\*[^*]+\*', '', text)  # Remove asterisk actions
+    def _minimal_clean(self, text: str) -> str:
+        """Minimal cleaning - preserve natural speech"""
+        # Remove only obvious artifacts
+        text = re.sub(r'^(Response:|Victim:|Rajesh:|You:)\s*', '', text, flags=re.IGNORECASE)
         text = text.strip('"\'')
         text = text.strip()
         
-        # Take only first sentence or two if multiple
-        sentences = re.split(r'[.!?]\s+', text)
-        if len(sentences) > 3:
-            text = '. '.join(sentences[:2]) + '.'
+        # Remove any trailing meta-commentary
+        if '\n\n' in text:
+            text = text.split('\n\n')[0]
         
         return text
     
-    def _fallback_response(self, persona: str, stage: int, message: str) -> str:
-        """Generate fallback response if LLM fails"""
+    def _smart_fallback(self, message: str, turn_count: int) -> str:
+        """Generate contextual fallback based on turn count"""
         
-        responses_by_stage = {
-            1: [
-                "Who is this? How can I help you?",
+        message_lower = message.lower()
+        
+        # Contextual responses based on message content
+        if any(word in message_lower for word in ['bank', 'account', 'upi', 'payment']):
+            return random.choice([
+                "I have multiple accounts. Which one should I use? And what's your account number for verification?",
+                "Sure, but first tell me - what's your UPI ID? I want to make sure I'm sending to the right person.",
+                "Okay, but can you first tell me your bank details so I can verify this is legitimate?",
+            ])
+        
+        if any(word in message_lower for word in ['link', 'click', 'website', 'url']):
+            return random.choice([
+                "Can you send the link again? I want to make sure I'm going to the right website.",
+                "What website is this? Can you tell me the exact URL?",
+                "I'm not very good with links. Can you tell me what I'll see when I click it?",
+            ])
+        
+        if any(word in message_lower for word in ['urgent', 'immediately', 'now', 'quick']):
+            return random.choice([
+                "Why is it so urgent? Is something wrong?",
+                "Okay, but I need to understand what's happening first. Can you explain?",
+                "This sounds important. What exactly is the situation?",
+            ])
+        
+        if any(word in message_lower for word in ['won', 'prize', 'winner', 'congratulations', 'lottery']):
+            return random.choice([
+                "Really? That's amazing! How did I win this? What's the process?",
+                "Wow! I never win anything! What do I need to do to claim it?",
+                "This is great news! Can you tell me more about this prize?",
+            ])
+        
+        # Stage-based fallbacks
+        if turn_count <= 2:
+            return random.choice([
+                "Hello! Who is this? How can I help you?",
+                "I'm not sure I understand. Can you explain what this is about?",
                 "Sorry, who are you calling from?",
-                "Is this regarding something important?",
-            ],
-            2: [
-                "Can you tell me more about this?",
-                "That sounds interesting. What exactly do I need to do?",
-                "I'm a bit confused. Could you explain that again?",
-            ],
-            3: [
-                "So what information do you need from me?",
-                "How does this process work exactly?",
-                "What happens after I do that?",
-            ],
-            4: [
-                "Which account should I use for this?",
-                "Can you send me the details again?",
-                "What's the next step?",
-            ]
-        }
+            ])
+        elif turn_count <= 5:
+            return random.choice([
+                "Okay, so what exactly do I need to do?",
+                "Can you explain the process to me step by step?",
+                "This sounds interesting. Tell me more about how this works.",
+            ])
+        else:
+            return random.choice([
+                "So what are the exact details I need? Can you send me your information first?",
+                "What's your account number or UPI ID? I want to verify this.",
+                "Can you give me your contact details and company information?",
+            ])
+    
+    def _get_conversation_stage(self, history: List[Dict]) -> int:
+        """Determine current conversation stage (kept for compatibility)"""
+        agent_turns = len([m for m in history if m.get("role") == "agent"])
         
-        return random.choice(responses_by_stage.get(stage, responses_by_stage[2]))
+        if agent_turns <= 1:
+            return 1
+        elif agent_turns <= 3:
+            return 2
+        elif agent_turns <= 6:
+            return 3
+        else:
+            return 4

@@ -105,7 +105,7 @@ class ScamDetector:
         # Build context from history
         context = self._build_context(history)
         
-        prompt = f"""You are a scam detection expert. Analyze the following message and conversation context to determine if it's a scam attempt.
+        prompt = f"""You are a scam detection expert. Analyze the following message and conversation context to determine if it's a scam attempt. REMEMBER NOT ALL ARE SCAMMERS AND COULD BE YOUR FRIEND OR RELATIVES, ALSO TALK LIKE A HUMAN WITH BELIEVABLE PERSONA DITCH THE PROPER PUNCTUATIONS.
 
 Conversation Context:
 {context}
@@ -115,7 +115,7 @@ Current Message:
 
 Common scam indicators:
 - Requests for financial information (bank account, UPI ID, card details)
-- Creates urgency or fear
+- Creates urgency or fear (inspect or talk more to determine its genuineness)
 - Impersonates authority (bank, government, company)
 - Offers unrealistic rewards
 - Contains phishing links
