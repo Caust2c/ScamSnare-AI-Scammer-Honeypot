@@ -1,6 +1,3 @@
-"""
-Intelligence Database - Stores extracted scam intelligence
-"""
 
 import json
 import os
@@ -16,7 +13,6 @@ class IntelligenceDB:
         self._ensure_db_exists()
     
     def _ensure_db_exists(self):
-        """Create database file if it doesn't exist"""
         if not self.db_path.exists():
             initial_data = {
                 "conversations": {},

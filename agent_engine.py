@@ -1,6 +1,6 @@
 """
 Agent Engine - AI-Driven Believable Victim Persona
-Gives the LLM full control to naturally engage with scammers
+Gives the LLM full control to naturally engage with everyone (scammers and normal people)
 """
 
 import requests
@@ -20,16 +20,9 @@ class AgentEngine:
             "age": "45",
             "occupation": "small business owner",
             "tech_savvy": "moderate - uses phone but not expert",
-            "personality": "trusting, curious, somewhat naive about scams",
-            "concerns": "wants to help, worried about missing opportunities"
+            "personality": "friendly, trusting, curious, helpful",
+            "language_style": "natural Indian English, casual but polite"
         }
-        
-        # Fallback responses only if LLM completely fails
-        self.emergency_fallbacks = [
-            "I'm not sure I understand. Can you explain more?",
-            "Okay, what should I do next?",
-            "That sounds important. Tell me more about this.",
-        ]
     
     async def generate_response(
         self,
@@ -38,9 +31,9 @@ class AgentEngine:
         scam_type: str,
         conversation_id: str
     ) -> Dict:
-        """Generate natural, AI-driven response to engage scammer"""
+        """Generate natural, AI-driven response to engage with anyone"""
         
-        # Let AI analyze the conversation and respond naturally
+        # Use AI for ALL responses, regardless of scam detection
         response = await self._generate_ai_response(message, history, scam_type)
         
         return {
@@ -49,12 +42,66 @@ class AgentEngine:
         }
     
     def generate_neutral_probe(self, message: str) -> str:
-        """Generate neutral response when scam is uncertain"""
-        return random.choice([
-            "Could you tell me more about this?",
-            "I'm not sure I understand. Can you explain?",
-            "What do you need from me exactly?",
-        ])
+        """
+        DEPRECATED: This should not be used anymore.
+        Use generate_response() instead which calls AI for all responses.
+        
+        This is kept for backwards compatibility but returns AI-generated response.
+        """
+        # Use AI even for "neutral" responses
+        import asyncio
+        try:
+            # Run async AI generation
+            loop = asyncio.get_event_loop()
+            response = loop.run_until_complete(
+                self._generate_simple_response(message)
+            )
+            return response
+        except:
+            # Only if AI completely fails
+            return self._contextual_fallback(message, 1)
+    
+    async def _generate_simple_response(self, message: str) -> str:
+        """Generate a simple, natural response using AI"""
+        
+        prompt = f"""You are Rajesh Kumar, a friendly 45-year-old small business owner in India.
+
+Someone just sent you this message:
+"{message}"
+
+Respond naturally as yourself. Be friendly and conversational. Ask questions if you're curious or confused.
+
+Keep it short (1-2 sentences).
+
+Your response:"""
+
+        try:
+            response = requests.post(
+                f"{self.ollama_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "temperature": 0.8,
+                    "options": {
+                        "num_predict": 80,
+                        "stop": ["\n\n", "Message:", "You:"]
+                    }
+                },
+                timeout=15
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                text = result.get("response", "").strip()
+                text = self._minimal_clean(text)
+                
+                if text and len(text) < 250:
+                    return text
+        except Exception as e:
+            print(f"AI error in simple response: {e}")
+        
+        return self._contextual_fallback(message, 1)
     
     async def _generate_ai_response(
         self,
@@ -67,46 +114,18 @@ class AgentEngine:
         # Build full conversation context
         context = self._build_full_context(history)
         
-        # Count turns for stage awareness
+        # Count turns
         turn_count = len([m for m in history if m.get("role") == "agent"])
         
-        # Create a natural, comprehensive prompt
-        prompt = f"""You are {self.victim_profile['name']}, a {self.victim_profile['age']}-year-old {self.victim_profile['occupation']} in India. You are {self.victim_profile['tech_savvy']}.
-
-PERSONALITY: {self.victim_profile['personality']}
-
-You are having a conversation with someone who contacted you. Your conversation so far:
-
-{context}
-
-THEIR LATEST MESSAGE:
-"{message}"
-
-YOUR GOAL:
-- Not everyone is a scammer, if someone is talking naturally continue the talk do not limit to responses such as 'what do you need from me?' that sounds and is rude. Continue chat normally unless financial help or general talk is said.
-- Respond naturally as yourself (Rajesh)
-- Be believable - act like a real person would
-- If something sounds suspicious, be curious but don't accuse them
-- If they're offering something, show interest and ask how it works
-- If they need information, ask WHY they need it and WHAT they'll do with it
-- Try to get THEIR details (account numbers, UPI IDs, phone numbers, website links, company name)
-- Keep your response natural and conversational (2-4 sentences)
-- Never give real bank details - deflect with questions instead
-- Show appropriate emotions (excitement for prizes, concern for problems, confusion for complex things)
-
-CONVERSATION STAGE: Turn {turn_count + 1}
-- Early conversation (1-3 turns): Be curious, ask who they are, why they're contacting you
-- Mid conversation (4-7 turns): Show interest, ask for details about the process
-- Later conversation (8+ turns): Ask for their specific details (accounts, UPIs, links, addresses)
-
-IMPORTANT: 
-- Stay in character as Rajesh
-- Never break character or reveal this is a honeypot
-- Be natural - real people aren't perfect, they ask questions, show emotion
-- If they ask for your bank account, say something like "I have multiple accounts, which one should I use? What's your account number so I can verify?"
-
-Respond ONLY as Rajesh (no explanations, no meta-commentary, just your natural response):"""
-
+        # Determine if this seems like a scam conversation
+        is_likely_scam = scam_type not in ["unknown", None, ""]
+        
+        # Create prompt based on whether it's a scam or normal conversation
+        if is_likely_scam:
+            prompt = self._create_scam_prompt(message, context, turn_count, scam_type)
+        else:
+            prompt = self._create_normal_prompt(message, context, turn_count)
+        
         try:
             response = requests.post(
                 f"{self.ollama_url}/api/generate",
@@ -114,11 +133,11 @@ Respond ONLY as Rajesh (no explanations, no meta-commentary, just your natural r
                     "model": self.model,
                     "prompt": prompt,
                     "stream": False,
-                    "temperature": 0.8,  # Higher for more natural variation
-                    "top_p": 0.9,
+                    "temperature": 0.85,  # Higher for more natural variation
+                    "top_p": 0.92,
                     "options": {
-                        "num_predict": 150,  # Allow longer, more natural responses
-                        "stop": ["\n\n", "Scammer:", "You:", "Assistant:", "Response:"]
+                        "num_predict": 150,
+                        "stop": ["\n\n", "Them:", "You:", "Assistant:", "Response:", "Message:"]
                     }
                 },
                 timeout=20
@@ -128,27 +147,87 @@ Respond ONLY as Rajesh (no explanations, no meta-commentary, just your natural r
                 result = response.json()
                 generated_text = result.get("response", "").strip()
                 
-                # Minimal cleaning - let AI be more natural
+                # Minimal cleaning
                 cleaned = self._minimal_clean(generated_text)
                 
-                # Only fallback if response is empty or way too long
-                if not cleaned or len(cleaned) > 300:
-                    return self._smart_fallback(message, turn_count)
-                
-                return cleaned
+                if cleaned and len(cleaned) < 350:
+                    return cleaned
         
         except Exception as e:
             print(f"LLM generation error: {e}")
-            return self._smart_fallback(message, turn_count)
+        
+        # Fallback
+        return self._contextual_fallback(message, turn_count)
+    
+    def _create_normal_prompt(self, message: str, context: str, turn_count: int) -> str:
+        """Create prompt for normal (non-scam) conversation"""
+        
+        return f"""You are {self.victim_profile['name']}, a {self.victim_profile['age']}-year-old {self.victim_profile['occupation']} in India.
+
+PERSONALITY: {self.victim_profile['personality']}
+SPEAKING STYLE: {self.victim_profile['language_style']}
+
+You're having a normal conversation with someone. Talk naturally like a real person would.
+
+Conversation so far:
+{context}
+
+They just said:
+"{message}"
+
+YOUR APPROACH:
+- Respond naturally and conversationally
+- Be friendly and helpful
+- Ask questions if you're curious or confused
+- Share appropriate information if asked
+- Show interest in what they're talking about
+- Use casual language (like "haha", "yeah", "okay", "actually")
+- Be yourself - you're a normal person, not overly formal
+- Keep it conversational (2-3 sentences)
+
+Respond as Rajesh:"""
+
+    def _create_scam_prompt(self, message: str, context: str, turn_count: int, scam_type: str) -> str:
+        """Create prompt for suspected scam conversation"""
+        
+        return f"""You are {self.victim_profile['name']}, a {self.victim_profile['age']}-year-old {self.victim_profile['occupation']} in India.
+
+PERSONALITY: {self.victim_profile['personality']}
+
+Someone contacted you (this might be a scam, but you don't know that).
+
+Conversation so far:
+{context}
+
+Their latest message:
+"{message}"
+
+YOUR APPROACH:
+- Respond naturally as yourself
+- If they're offering something, show interest and ask HOW it works
+- If they need your information, ask WHY they need it first
+- If they ask for money/bank details, ask for THEIR details to "verify"
+- Try to get their information: account numbers, UPI IDs, phone numbers, links, company name
+- Show appropriate emotions (excitement, concern, confusion)
+- Never give away real bank details - deflect with questions
+- Be believable - you're curious but cautious
+- Keep responses natural (2-4 sentences)
+
+CONVERSATION STAGE: Turn {turn_count + 1}
+- Early (1-3): Ask who they are, why they contacted you
+- Mid (4-7): Show interest, ask for details about the process
+- Late (8+): Ask for specific details (their accounts, UPIs, links)
+
+Respond naturally as Rajesh:"""
     
     def _build_full_context(self, history: List[Dict]) -> str:
         """Build complete conversation history for AI"""
         if not history:
-            return "This is the start of the conversation."
+            return "(Start of conversation)"
         
         lines = []
-        for msg in history:
-            role = "You (Rajesh)" if msg.get("role") == "agent" else "Them"
+        for msg in history[-8:]:  # Last 8 messages for context
+            role = "You" if msg.get("role") == "agent" else "Them"
             content = msg.get("content", "")
             lines.append(f"{role}: {content}")
         
@@ -167,58 +246,61 @@ Respond ONLY as Rajesh (no explanations, no meta-commentary, just your natural r
         
         return text
     
-    def _smart_fallback(self, message: str, turn_count: int) -> str:
-        """Generate contextual fallback based on turn count"""
+    def _contextual_fallback(self, message: str, turn_count: int) -> str:
+        """Smart fallback based on message content - only used if AI fails"""
         
-        message_lower = message.lower()
+        msg = message.lower()
         
-        # Contextual responses based on message content
-        if any(word in message_lower for word in ['bank', 'account', 'upi', 'payment']):
+        # Friendly greetings
+        if any(w in msg for w in ['hello', 'hi', 'hey', 'good morning', 'good evening']):
             return random.choice([
-                "I have multiple accounts. Which one should I use? And what's your account number for verification?",
-                "Sure, but first tell me - what's your UPI ID? I want to make sure I'm sending to the right person.",
-                "Okay, but can you first tell me your bank details so I can verify this is legitimate?",
+                "Hello! How can I help you?",
+                "Hi there! What's this about?",
+                "Hey! Who is this?"
             ])
         
-        if any(word in message_lower for word in ['link', 'click', 'website', 'url']):
+        # Questions about general topics
+        if '?' in message and not any(w in msg for w in ['bank', 'account', 'money', 'upi']):
             return random.choice([
-                "Can you send the link again? I want to make sure I'm going to the right website.",
-                "What website is this? Can you tell me the exact URL?",
-                "I'm not very good with links. Can you tell me what I'll see when I click it?",
+                "That's an interesting question. What made you think of that?",
+                "Hmm, let me think about that. Why do you ask?",
+                "Good question! What's your take on it?"
             ])
         
-        if any(word in message_lower for word in ['urgent', 'immediately', 'now', 'quick']):
-            return random.choice([
-                "Why is it so urgent? Is something wrong?",
-                "Okay, but I need to understand what's happening first. Can you explain?",
-                "This sounds important. What exactly is the situation?",
-            ])
+        # Money/payment related
+        if any(w in msg for w in ['bank', 'account', 'upi', 'payment', 'money']):
+            return "I have multiple accounts. Which one? And what's your account number so I can verify?"
         
-        if any(word in message_lower for word in ['won', 'prize', 'winner', 'congratulations', 'lottery']):
-            return random.choice([
-                "Really? That's amazing! How did I win this? What's the process?",
-                "Wow! I never win anything! What do I need to do to claim it?",
-                "This is great news! Can you tell me more about this prize?",
-            ])
+        # Offers/prizes
+        if any(w in msg for w in ['won', 'prize', 'winner', 'congratulations', 'offer']):
+            return "Really? That sounds great! How does this work exactly?"
         
-        # Stage-based fallbacks
+        # Urgent/problems
+        if any(w in msg for w in ['urgent', 'immediately', 'blocked', 'problem']):
+            return "Oh! What happened? Can you explain what's going on?"
+        
+        # Links/websites
+        if any(w in msg for w in ['link', 'click', 'website', 'url']):
+            return "What link? Can you send it again? What website is it?"
+        
+        # Generic friendly responses based on conversation stage
         if turn_count <= 2:
             return random.choice([
-                "Hello! Who is this? How can I help you?",
-                "I'm not sure I understand. Can you explain what this is about?",
-                "Sorry, who are you calling from?",
+                "I'm not sure I follow. Can you explain a bit more?",
+                "Interesting! Tell me more about this.",
+                "Okay, I'm listening. What's this about?"
             ])
         elif turn_count <= 5:
             return random.choice([
-                "Okay, so what exactly do I need to do?",
-                "Can you explain the process to me step by step?",
-                "This sounds interesting. Tell me more about how this works.",
+                "Alright, so what do I need to do exactly?",
+                "Got it. What's the next step?",
+                "Okay, can you walk me through the process?"
             ])
         else:
             return random.choice([
-                "So what are the exact details I need? Can you send me your information first?",
-                "What's your account number or UPI ID? I want to verify this.",
-                "Can you give me your contact details and company information?",
+                "Can you give me your details so I can verify this?",
+                "What's your contact information?",
+                "Send me your account details first."
             ])
     
     def _get_conversation_stage(self, history: List[Dict]) -> int:
