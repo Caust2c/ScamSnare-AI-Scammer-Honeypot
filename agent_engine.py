@@ -1,8 +1,3 @@
-"""
-Agent Engine - AI-Driven Believable Victim Persona
-Gives the LLM full control to naturally engage with everyone (scammers and normal people)
-"""
-
 import requests
 import random
 import re
@@ -13,8 +8,7 @@ class AgentEngine:
     def __init__(self, ollama_url="http://localhost:11434"):
         self.ollama_url = ollama_url
         self.model = "llama3.2:3b"
-        
-        # Core victim personality (consistent across conversation)
+        #Enter your own type of personality here
         self.victim_profile = {
             "name": "Rajesh Kumar",
             "age": "45",
@@ -31,9 +25,6 @@ class AgentEngine:
         scam_type: str,
         conversation_id: str
     ) -> Dict:
-        """Generate natural, AI-driven response to engage with anyone"""
-        
-        # Use AI for ALL responses, regardless of scam detection
         response = await self._generate_ai_response(message, history, scam_type)
         
         return {
@@ -43,27 +34,19 @@ class AgentEngine:
     
     def generate_neutral_probe(self, message: str) -> str:
         """
-        DEPRECATED: This should not be used anymore.
-        Use generate_response() instead which calls AI for all responses.
-        
-        This is kept for backwards compatibility but returns AI-generated response.
+        DEPRECATED
         """
-        # Use AI even for "neutral" responses
         import asyncio
         try:
-            # Run async AI generation
             loop = asyncio.get_event_loop()
             response = loop.run_until_complete(
                 self._generate_simple_response(message)
             )
             return response
         except:
-            # Only if AI completely fails
             return self._contextual_fallback(message, 1)
     
     async def _generate_simple_response(self, message: str) -> str:
-        """Generate a simple, natural response using AI"""
-        
         prompt = f"""You are Rajesh Kumar, a friendly 45-year-old small business owner in India.
 
 Someone just sent you this message:
@@ -109,18 +92,10 @@ Your response:"""
         history: List[Dict],
         scam_type: str
     ) -> str:
-        """Let the AI generate a completely natural response"""
-        
-        # Build full conversation context
         context = self._build_full_context(history)
-        
-        # Count turns
         turn_count = len([m for m in history if m.get("role") == "agent"])
-        
-        # Determine if this seems like a scam conversation
         is_likely_scam = scam_type not in ["unknown", None, ""]
         
-        # Create prompt based on whether it's a scam or normal conversation
         if is_likely_scam:
             prompt = self._create_scam_prompt(message, context, turn_count, scam_type)
         else:
@@ -133,7 +108,7 @@ Your response:"""
                     "model": self.model,
                     "prompt": prompt,
                     "stream": False,
-                    "temperature": 0.85,  # Higher for more natural variation
+                    "temperature": 0.85, 
                     "top_p": 0.92,
                     "options": {
                         "num_predict": 150,
@@ -147,7 +122,6 @@ Your response:"""
                 result = response.json()
                 generated_text = result.get("response", "").strip()
                 
-                # Minimal cleaning
                 cleaned = self._minimal_clean(generated_text)
                 
                 if cleaned and len(cleaned) < 350:
@@ -160,8 +134,6 @@ Your response:"""
         return self._contextual_fallback(message, turn_count)
     
     def _create_normal_prompt(self, message: str, context: str, turn_count: int) -> str:
-        """Create prompt for normal (non-scam) conversation"""
-        
         return f"""You are {self.victim_profile['name']}, a {self.victim_profile['age']}-year-old {self.victim_profile['occupation']} in India.
 
 PERSONALITY: {self.victim_profile['personality']}
@@ -188,8 +160,6 @@ YOUR APPROACH:
 Respond as Rajesh:"""
 
     def _create_scam_prompt(self, message: str, context: str, turn_count: int, scam_type: str) -> str:
-        """Create prompt for suspected scam conversation"""
-        
         return f"""You are {self.victim_profile['name']}, a {self.victim_profile['age']}-year-old {self.victim_profile['occupation']} in India.
 
 PERSONALITY: {self.victim_profile['personality']}
@@ -221,12 +191,11 @@ CONVERSATION STAGE: Turn {turn_count + 1}
 Respond naturally as Rajesh:"""
     
     def _build_full_context(self, history: List[Dict]) -> str:
-        """Build complete conversation history for AI"""
         if not history:
             return "(Start of conversation)"
         
         lines = []
-        for msg in history[-8:]:  # Last 8 messages for context
+        for msg in history[-8:]: 
             role = "You" if msg.get("role") == "agent" else "Them"
             content = msg.get("content", "")
             lines.append(f"{role}: {content}")
@@ -234,24 +203,19 @@ Respond naturally as Rajesh:"""
         return "\n".join(lines)
     
     def _minimal_clean(self, text: str) -> str:
-        """Minimal cleaning - preserve natural speech"""
-        # Remove only obvious artifacts
         text = re.sub(r'^(Response:|Victim:|Rajesh:|You:)\s*', '', text, flags=re.IGNORECASE)
         text = text.strip('"\'')
         text = text.strip()
         
-        # Remove any trailing meta-commentary
         if '\n\n' in text:
             text = text.split('\n\n')[0]
         
         return text
     
     def _contextual_fallback(self, message: str, turn_count: int) -> str:
-        """Smart fallback based on message content - only used if AI fails"""
         
         msg = message.lower()
         
-        # Friendly greetings
         if any(w in msg for w in ['hello', 'hi', 'hey', 'good morning', 'good evening']):
             return random.choice([
                 "Hello! How can I help you?",
@@ -259,7 +223,6 @@ Respond naturally as Rajesh:"""
                 "Hey! Who is this?"
             ])
         
-        # Questions about general topics
         if '?' in message and not any(w in msg for w in ['bank', 'account', 'money', 'upi']):
             return random.choice([
                 "That's an interesting question. What made you think of that?",
@@ -267,23 +230,18 @@ Respond naturally as Rajesh:"""
                 "Good question! What's your take on it?"
             ])
         
-        # Money/payment related
         if any(w in msg for w in ['bank', 'account', 'upi', 'payment', 'money']):
             return "I have multiple accounts. Which one? And what's your account number so I can verify?"
         
-        # Offers/prizes
         if any(w in msg for w in ['won', 'prize', 'winner', 'congratulations', 'offer']):
             return "Really? That sounds great! How does this work exactly?"
         
-        # Urgent/problems
         if any(w in msg for w in ['urgent', 'immediately', 'blocked', 'problem']):
             return "Oh! What happened? Can you explain what's going on?"
         
-        # Links/websites
         if any(w in msg for w in ['link', 'click', 'website', 'url']):
             return "What link? Can you send it again? What website is it?"
         
-        # Generic friendly responses based on conversation stage
         if turn_count <= 2:
             return random.choice([
                 "I'm not sure I follow. Can you explain a bit more?",
@@ -304,7 +262,6 @@ Respond naturally as Rajesh:"""
             ])
     
     def _get_conversation_stage(self, history: List[Dict]) -> int:
-        """Determine current conversation stage (kept for compatibility)"""
         agent_turns = len([m for m in history if m.get("role") == "agent"])
         
         if agent_turns <= 1:

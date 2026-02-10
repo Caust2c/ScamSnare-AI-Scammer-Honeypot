@@ -1,14 +1,9 @@
-"""
-Intelligence Extractor - Extracts actionable scam intelligence from conversations
-"""
-
 import re
 from typing import List, Dict, Set
 
 
 class IntelligenceExtractor:
     def __init__(self):
-        # Regex patterns for different intelligence types
         self.patterns = {
             "bank_account": r'\b\d{9,18}\b',  # 9-18 digit account numbers
             "ifsc_code": r'\b[A-Z]{4}0[A-Z0-9]{6}\b',  # Indian IFSC codes
@@ -20,23 +15,17 @@ class IntelligenceExtractor:
             "aadhaar": r'\b\d{4}[-\s]?\d{4}[-\s]?\d{4}\b'
         }
         
-        # Common UPI handles
         self.upi_handles = [
             "@paytm", "@oksbi", "@ybl", "@okicici", "@okaxis",
             "@okhdfcbank", "@ibl", "@axl", "@fbl", "@upi"
         ]
         
-        # Bank names for context
         self.bank_names = [
             "sbi", "hdfc", "icici", "axis", "kotak", "pnb",
             "canara", "bank of baroda", "union bank", "idbi"
         ]
     
     def extract(self, history: List[Dict], current_message: str) -> Dict:
-        """
-        Extract intelligence from conversation history and current message
-        """
-        # Combine all messages for extraction
         all_text = current_message + " "
         for msg in history:
             all_text += msg.get("content", "") + " "
@@ -57,8 +46,6 @@ class IntelligenceExtractor:
             "scammer_claims": self._extract_claims(history),
             "extracted_count": 0
         }
-        
-        # Count total extracted items
         intelligence["extracted_count"] = sum(
             len(v) if isinstance(v, list) else 0
             for k, v in intelligence.items()
@@ -68,17 +55,15 @@ class IntelligenceExtractor:
         return intelligence
     
     def _extract_unique(self, text: str, pattern_type: str) -> List[str]:
-        """Extract unique matches for a pattern"""
+    
         pattern = self.patterns.get(pattern_type)
         if not pattern:
             return []
         
         matches = re.findall(pattern, text, re.IGNORECASE)
         
-        # Filter and deduplicate
         unique_matches = list(set(matches))
         
-        # Additional validation for specific types
         if pattern_type == "bank_account":
             unique_matches = [m for m in unique_matches if self._validate_bank_account(m)]
         elif pattern_type == "upi_id":
@@ -89,16 +74,12 @@ class IntelligenceExtractor:
         return unique_matches
     
     def _validate_bank_account(self, account: str) -> bool:
-        """Validate if account number looks legitimate"""
-        # Basic validation
         if len(account) < 9 or len(account) > 18:
             return False
         
-        # Shouldn't be all same digits
         if len(set(account)) == 1:
             return False
         
-        # Shouldn't be sequential
         if account in "0123456789" * 2:
             return False
         
@@ -121,7 +102,6 @@ class IntelligenceExtractor:
         return any(indicator in url_lower for indicator in suspicious_indicators)
     
     def _extract_bank_names(self, text: str) -> List[str]:
-        """Extract mentioned bank names"""
         found_banks = []
         for bank in self.bank_names:
             if bank in text:
@@ -130,7 +110,6 @@ class IntelligenceExtractor:
         return list(set(found_banks))
     
     def _extract_company_names(self, text: str) -> List[str]:
-        """Extract company/organization names that scammer claims to represent"""
         companies = []
         
         # Common impersonation targets
@@ -147,7 +126,6 @@ class IntelligenceExtractor:
         return list(set(companies))
     
     def _extract_claims(self, history: List[Dict]) -> List[str]:
-        """Extract key claims made by scammer"""
         claims = []
         
         for msg in history:
@@ -180,16 +158,13 @@ class IntelligenceExtractor:
 
 
 class IntelligenceValidator:
-    """Validates extracted intelligence for quality"""
     
     @staticmethod
     def validate_extraction(intelligence: Dict) -> Dict:
-        """Validate and score extracted intelligence"""
         
         score = 0
         quality_indicators = {}
         
-        # High-value extractions
         if intelligence["bank_accounts"]:
             score += 30
             quality_indicators["has_bank_account"] = True
@@ -202,7 +177,6 @@ class IntelligenceValidator:
             score += 20
             quality_indicators["has_phishing_url"] = True
         
-        # Medium-value extractions
         if intelligence["phone_numbers"]:
             score += 15
             quality_indicators["has_phone"] = True
@@ -211,7 +185,6 @@ class IntelligenceValidator:
             score += 15
             quality_indicators["has_ifsc"] = True
         
-        # Supporting information
         if intelligence["bank_names"]:
             score += 5
         

@@ -1,8 +1,3 @@
-"""
-AI-Powered Agentic Honey-Pot System
-Main API endpoint for receiving and processing scam messages
-"""
-
 from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -19,7 +14,6 @@ from config import API_KEY
 
 app = FastAPI(title="Agentic Honey-Pot API")
 
-# Enable CORS for web interface
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # In production, specify exact origins
@@ -28,20 +22,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# Initialize components
 scam_detector = ScamDetector()
 agent_engine = AgentEngine()
 intelligence_extractor = IntelligenceExtractor()
-intelligence_db = IntelligenceDB()  # Database for storing intelligence
-
-# Store conversation history (in production, use Redis/Database)
+intelligence_db = IntelligenceDB()  
 conversation_store: Dict[str, List[Dict]] = {}
 
 
 class Message(BaseModel):
     conversation_id: str
-    sender: str  # "user" or "scammer"
+    sender: str 
     message: str
     timestamp: Optional[str] = None
 
@@ -63,7 +53,6 @@ class ResponseOutput(BaseModel):
 
 
 def verify_api_key(x_api_key: str = Header(...)):
-    """Verify API key from header"""
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API Key")
     return x_api_key
@@ -71,7 +60,6 @@ def verify_api_key(x_api_key: str = Header(...)):
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
     return {
         "status": "online",
         "service": "Agentic Honey-Pot API",
@@ -84,17 +72,13 @@ async def detect_and_engage(
     request: IncomingRequest,
     x_api_key: str = Header(..., alias="X-API-Key")
 ):
-    """
-    Main endpoint to receive messages, detect scams, and engage scammers
-    """
-    # Verify API key
+  
     verify_api_key(x_api_key)
     
     conversation_id = request.conversation_id
     incoming_message = request.message
     history = request.history or []
     
-    # Store/update conversation history
     if conversation_id not in conversation_store:
         conversation_store[conversation_id] = []
     
@@ -104,19 +88,16 @@ async def detect_and_engage(
         "timestamp": datetime.now().isoformat()
     })
     
-    # Get full conversation context
     full_history = conversation_store[conversation_id]
     
-    # Step 1: Detect scam intent
     scam_result = await scam_detector.analyze(incoming_message, full_history)
     
     scam_detected = scam_result["is_scam"]
     confidence = scam_result["confidence"]
     scam_type = scam_result.get("scam_type", "unknown")
     
-    # Step 2: Generate response
     if scam_detected and confidence > 0.6:
-        # Activate agent for engagement
+
         agent_response = await agent_engine.generate_response(
             message=incoming_message,
             history=full_history,
@@ -127,7 +108,6 @@ async def detect_and_engage(
         response_message = agent_response["message"]
         agent_activated = True
         
-        # Store agent response
         conversation_store[conversation_id].append({
             "role": "agent",
             "content": response_message,
@@ -135,7 +115,6 @@ async def detect_and_engage(
         })
         
     else:
-        # Not confident it's a scam - probe gently
         response_message = agent_engine.generate_neutral_probe(incoming_message)
         agent_activated = False
         
@@ -145,13 +124,11 @@ async def detect_and_engage(
             "timestamp": datetime.now().isoformat()
         })
     
-    # Step 3: Extract intelligence from conversation
     extracted_intel = intelligence_extractor.extract(
         full_history,
         incoming_message
     )
     
-    # Step 4: Calculate engagement metrics
     engagement_metrics = {
         "total_turns": len(full_history),
         "agent_turns": len([m for m in full_history if m.get("role") == "agent"]),
@@ -159,7 +136,6 @@ async def detect_and_engage(
         "intelligence_items_found": len([v for v in extracted_intel.values() if v])
     }
     
-    # Step 5: Save to database
     intelligence_db.save_conversation(
         conversation_id=conversation_id,
         scam_detected=scam_detected,
@@ -169,7 +145,6 @@ async def detect_and_engage(
         metrics=engagement_metrics
     )
     
-    # Return structured response
     return ResponseOutput(
         conversation_id=conversation_id,
         scam_detected=scam_detected,
@@ -182,7 +157,6 @@ async def detect_and_engage(
 
 
 def calculate_duration(history: List[Dict]) -> int:
-    """Calculate conversation duration in seconds"""
     if len(history) < 2:
         return 0
     
@@ -199,7 +173,6 @@ async def get_conversation(
     conversation_id: str,
     x_api_key: str = Header(..., alias="X-API-Key")
 ):
-    """Retrieve conversation history"""
     verify_api_key(x_api_key)
     
     if conversation_id not in conversation_store:
@@ -216,7 +189,6 @@ async def delete_conversation(
     conversation_id: str,
     x_api_key: str = Header(..., alias="X-API-Key")
 ):
-    """Delete conversation history"""
     verify_api_key(x_api_key)
     
     if conversation_id in conversation_store:
@@ -230,7 +202,6 @@ async def delete_conversation(
 async def get_all_intelligence(
     x_api_key: str = Header(..., alias="X-API-Key")
 ):
-    """Get all extracted intelligence"""
     verify_api_key(x_api_key)
     return intelligence_db.get_all_intelligence()
 
@@ -239,7 +210,6 @@ async def get_all_intelligence(
 async def get_intelligence_stats(
     x_api_key: str = Header(..., alias="X-API-Key")
 ):
-    """Get intelligence statistics"""
     verify_api_key(x_api_key)
     return intelligence_db.get_statistics()
 
@@ -248,7 +218,6 @@ async def get_intelligence_stats(
 async def get_high_value_intelligence(
     x_api_key: str = Header(..., alias="X-API-Key")
 ):
-    """Get only high-value intelligence (bank accounts, UPIs, etc.)"""
     verify_api_key(x_api_key)
     return intelligence_db.get_high_value_intelligence()
 
@@ -258,7 +227,6 @@ async def get_all_conversations(
     limit: int = 50,
     x_api_key: str = Header(..., alias="X-API-Key")
 ):
-    """Get all conversations with extracted intelligence"""
     verify_api_key(x_api_key)
     return intelligence_db.get_conversations(limit=limit)
 
@@ -267,7 +235,6 @@ async def get_all_conversations(
 async def export_intelligence(
     x_api_key: str = Header(..., alias="X-API-Key")
 ):
-    """Export all intelligence to JSON file"""
     verify_api_key(x_api_key)
     filename = intelligence_db.export_intelligence()
     return {"status": "exported", "filename": filename}
