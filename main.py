@@ -115,7 +115,7 @@ async def detect_and_engage(
         })
         
     else:
-        response_message = agent_engine.generate_neutral_probe(incoming_message)
+        response_message = await agent_engine.generate_neutral_probe(incoming_message)
         agent_activated = False
         
         conversation_store[conversation_id].append({

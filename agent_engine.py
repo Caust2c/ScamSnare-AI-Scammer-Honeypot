@@ -37,18 +37,11 @@ class AgentEngine:
             "conversation_id": conversation_id
         }
     
-    def generate_neutral_probe(self, message: str) -> str:
+    async def generate_neutral_probe(self, message: str) -> str:
         """Generate simple response - raises AIResponseError if fails"""
-        import asyncio
+        return await self._generate_simple_response(message)
         
-        try:
-            loop = asyncio.get_event_loop()
-            response = loop.run_until_complete(
-                self._generate_simple_response(message)
-            )
-            return response
-        except Exception as e:
-            raise AIResponseError(f"Failed to generate neutral probe: {str(e)}")
+        
     
     async def _generate_simple_response(self, message: str) -> str:
         """Generate simple AI response - no fallbacks"""
