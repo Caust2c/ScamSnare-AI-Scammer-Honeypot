@@ -346,11 +346,9 @@
     </div>
 
     <script>
-        // Configuration
         const API_URL = 'http://localhost:8000/detect';
         const API_KEY = '123456'; // Change this to match your config.py
 
-        // State
         let conversationId = 'web_' + Date.now();
         let conversationHistory = [];
         let stats = {
@@ -359,13 +357,11 @@
             intelligence: 0
         };
 
-        // DOM Elements
         const chatArea = document.getElementById('chat-area');
         const messageInput = document.getElementById('message-input');
         const sendBtn = document.getElementById('send-btn');
         const loading = document.getElementById('loading');
 
-        // Initialize
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') sendMessage();
         });
@@ -374,21 +370,17 @@
             const message = messageInput.value.trim();
             if (!message) return;
 
-            // Disable input
             messageInput.disabled = true;
             sendBtn.disabled = true;
             loading.classList.add('active');
 
-            // Clear empty state
             const emptyState = chatArea.querySelector('.empty-state');
             if (emptyState) emptyState.remove();
 
-            // Add scammer message to UI
             addMessage('scammer', message);
             messageInput.value = '';
 
             try {
-                // Call API
                 const response = await fetch(API_URL, {
                     method: 'POST',
                     headers: {
@@ -408,7 +400,6 @@
 
                 const data = await response.json();
 
-                // Update conversation history
                 conversationHistory.push({
                     role: 'scammer',
                     content: message,
@@ -421,22 +412,18 @@
                     timestamp: new Date().toISOString()
                 });
 
-                // Add agent response to UI
                 addMessage('agent', data.response_message);
 
-                // Show detection info
                 if (data.scam_detected) {
                     addInfoPanel(data);
                 }
 
-                // Update stats
                 updateStats(data);
 
             } catch (error) {
                 console.error('Error:', error);
                 addMessage('system', `Error: ${error.message}. Make sure the server is running!`);
             } finally {
-                // Re-enable input
                 messageInput.disabled = false;
                 sendBtn.disabled = false;
                 loading.classList.remove('active');
@@ -477,7 +464,6 @@
             html += `Confidence: ${(data.confidence_score * 100).toFixed(0)}%<br>`;
             html += `Agent Activated: ${data.agent_activated ? 'YES' : 'NO'}`;
 
-            // Show extracted intelligence
             const intel = data.extracted_intelligence;
             const items = [];
             

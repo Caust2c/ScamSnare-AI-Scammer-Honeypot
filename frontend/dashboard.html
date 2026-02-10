@@ -312,7 +312,6 @@
             <p>Extracted scam intelligence from honeypot conversations</p>
         </div>
 
-        <!-- Statistics -->
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-icon">💬</div>
@@ -336,7 +335,6 @@
             </div>
         </div>
 
-        <!-- Extracted Intelligence -->
         <div class="section">
             <div class="section-header">
                 <h2 class="section-title">📦 Extracted Intelligence</h2>
@@ -349,7 +347,6 @@
             <div id="intelligence-content" class="loading">Loading intelligence data</div>
         </div>
 
-        <!-- Recent Conversations -->
         <div class="section">
             <div class="section-header">
                 <h2 class="section-title">💬 Recent Conversations</h2>
@@ -361,7 +358,7 @@
 
     <script>
         const API_URL = 'http://localhost:8000';
-        const API_KEY = '123456'; 
+        const API_KEY = '123456'; //Set to match config.py
 
         async function loadStats() {
             try {
@@ -531,7 +528,6 @@
 
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                // Visual feedback
                 event.target.textContent = '✓';
                 setTimeout(() => {
                     event.target.textContent = '📋';
@@ -539,10 +535,8 @@
             });
         }
 
-        // Auto-refresh every 30 seconds
         setInterval(refreshData, 30000);
 
-        // Initial load
         refreshData();
     </script>
 </body>
