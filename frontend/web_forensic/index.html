@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scam Intelligence Platform - Forensic Analysis</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <div class="logo-icon"></div>
+                    <span class="logo-text">SCAM INTELLIGENCE PLATFORM</span>
+                </div>
+                <div class="session-id">
+                    <span class="label">SESSION ID:</span>
+                    <span class="value" id="session-id"></span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="system-status">
+                    <span class="status-indicator" id="status-indicator"></span>
+                    <span class="status-text" id="status-text">ONLINE</span>
+                </div>
+                <div class="timestamp" id="current-time"></div>
+            </div>
+        </header>
+
+        <div class="metrics-panel">
+            <div class="metric-card">
+                <div class="metric-label">CONVERSATION TURNS</div>
+                <div class="metric-value" id="turn-count">0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">THREAT CONFIDENCE</div>
+                <div class="metric-value" id="scam-confidence">0%</div>
+                <div class="metric-bar">
+                    <div class="metric-bar-fill" id="confidence-bar"></div>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">INTEL EXTRACTED</div>
+                <div class="metric-value" id="intel-count">0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">CLASSIFICATION</div>
+                <div class="metric-value status-unknown" id="classification">UNKNOWN</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="conversation-panel">
+                <div class="panel-header">
+                    <span class="panel-title">CONVERSATION LOG</span>
+                    <button class="btn-secondary" onclick="clearConversation()">CLEAR SESSION</button>
+                </div>
+                <div class="conversation-area" id="conversation-area">
+                    <div class="empty-state">
+                        <div class="empty-icon"></div>
+                        <p>NO ACTIVE CONVERSATION</p>
+                        <span>Initiate contact to begin analysis</span>
+                    </div>
+                </div>
+                <div class="processing-indicator" id="processing-indicator">
+                    <span class="processing-text">PROCESSING</span>
+                    <div class="processing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="analysis-panel">
+                <div class="panel-header">
+                    <span class="panel-title">THREAT ANALYSIS</span>
+                </div>
+                <div class="analysis-content" id="analysis-content">
+                    <div class="analysis-placeholder">
+                        <p>Awaiting data...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-panel">
+            <input 
+                type="text" 
+                id="message-input" 
+                class="message-input"
+                placeholder="Enter message to simulate threat actor communication..."
+                autocomplete="off"
+            />
+            <button class="btn-primary" id="send-btn" onclick="sendMessage()">
+                <span>TRANSMIT</span>
+            </button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

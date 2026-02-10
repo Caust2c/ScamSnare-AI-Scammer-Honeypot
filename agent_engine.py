@@ -1,21 +1,25 @@
 import requests
-import random
 import re
 from typing import List, Dict
+
+
+class AIResponseError(Exception):
+    """Raised when AI fails to generate a valid response"""
+    pass
 
 
 class AgentEngine:
     def __init__(self, ollama_url="http://localhost:11434"):
         self.ollama_url = ollama_url
         self.model = "llama3.2:3b"
-        #Enter your own type of personality here
+        
         self.victim_profile = {
-            "name": "Rajesh Kumar",
-            "age": "45",
-            "occupation": "small business owner",
-            "tech_savvy": "moderate - uses phone but not expert",
+            "name": "Hardik Lalla",
+            "age": "20",
+            "occupation": "Engineering student",
+            "tech_savvy": "moderate - uses phone but not an expert",
             "personality": "friendly, trusting, curious, helpful",
-            "language_style": "natural Indian English, casual but polite"
+            "language_style": "natural English, casual but polite"
         }
     
     async def generate_response(
@@ -25,6 +29,7 @@ class AgentEngine:
         scam_type: str,
         conversation_id: str
     ) -> Dict:
+        """Generate AI response - raises AIResponseError if fails"""
         response = await self._generate_ai_response(message, history, scam_type)
         
         return {
@@ -33,21 +38,22 @@ class AgentEngine:
         }
     
     def generate_neutral_probe(self, message: str) -> str:
-        """
-        DEPRECATED
-        """
+        """Generate simple response - raises AIResponseError if fails"""
         import asyncio
+        
         try:
             loop = asyncio.get_event_loop()
             response = loop.run_until_complete(
                 self._generate_simple_response(message)
             )
             return response
-        except:
-            return self._contextual_fallback(message, 1)
+        except Exception as e:
+            raise AIResponseError(f"Failed to generate neutral probe: {str(e)}")
     
     async def _generate_simple_response(self, message: str) -> str:
-        prompt = f"""You are Rajesh Kumar, a friendly 45-year-old small business owner in India.
+        """Generate simple AI response - no fallbacks"""
+        
+        prompt = f"""You are Hardik Lalla, a friendly 20-year-old engineering student in India.
 
 Someone just sent you this message:
 "{message}"
@@ -71,20 +77,36 @@ Your response:"""
                         "stop": ["\n\n", "Message:", "You:"]
                     }
                 },
-                timeout=15
+                timeout=80
             )
             
-            if response.status_code == 200:
-                result = response.json()
-                text = result.get("response", "").strip()
-                text = self._minimal_clean(text)
-                
-                if text and len(text) < 250:
-                    return text
+            if response.status_code != 200:
+                raise AIResponseError(f"Ollama API returned status {response.status_code}")
+            
+            result = response.json()
+            text = result.get("response", "").strip()
+            
+            if not text:
+                raise AIResponseError("Ollama returned empty response")
+            
+            cleaned = self._minimal_clean(text)
+            
+            if not cleaned:
+                raise AIResponseError("Response cleaning resulted in empty text")
+            
+            if len(cleaned) > 250:
+                raise AIResponseError(f"Response too long ({len(cleaned)} chars)")
+            
+            return cleaned
+            
+        except requests.exceptions.Timeout:
+            raise AIResponseError("Ollama request timed out after 80 seconds")
+        except requests.exceptions.ConnectionError:
+            raise AIResponseError("Cannot connect to Ollama - is it running?")
+        except requests.exceptions.RequestException as e:
+            raise AIResponseError(f"Request error: {str(e)}")
         except Exception as e:
-            print(f"AI error in simple response: {e}")
-        
-        return self._contextual_fallback(message, 1)
+            raise AIResponseError(f"Unexpected error in simple response: {str(e)}")
     
     async def _generate_ai_response(
         self,
@@ -92,6 +114,8 @@ Your response:"""
         history: List[Dict],
         scam_type: str
     ) -> str:
+        """Generate full AI response - no fallbacks, raises errors"""
+        
         context = self._build_full_context(history)
         turn_count = len([m for m in history if m.get("role") == "agent"])
         is_likely_scam = scam_type not in ["unknown", None, ""]
@@ -108,32 +132,64 @@ Your response:"""
                     "model": self.model,
                     "prompt": prompt,
                     "stream": False,
-                    "temperature": 0.85, 
+                    "temperature": 0.85,
                     "top_p": 0.92,
                     "options": {
                         "num_predict": 150,
                         "stop": ["\n\n", "Them:", "You:", "Assistant:", "Response:", "Message:"]
                     }
                 },
-                timeout=20
+                timeout=80
             )
             
-            if response.status_code == 200:
-                result = response.json()
-                generated_text = result.get("response", "").strip()
-                
-                cleaned = self._minimal_clean(generated_text)
-                
-                if cleaned and len(cleaned) < 350:
-                    return cleaned
-        
+            if response.status_code != 200:
+                raise AIResponseError(
+                    f"Ollama API error: Status {response.status_code}, "
+                    f"Response: {response.text[:200]}"
+                )
+            
+            result = response.json()
+            generated_text = result.get("response", "").strip()
+            
+            if not generated_text:
+                raise AIResponseError("Ollama returned empty response")
+            
+            cleaned = self._minimal_clean(generated_text)
+            
+            if not cleaned:
+                raise AIResponseError(
+                    f"Response cleaning resulted in empty text. "
+                    f"Original: {generated_text[:100]}"
+                )
+            
+            if len(cleaned) > 350:
+                raise AIResponseError(
+                    f"Response too long ({len(cleaned)} chars). "
+                    f"Preview: {cleaned[:100]}..."
+                )
+            
+            return cleaned
+            
+        except requests.exceptions.Timeout:
+            raise AIResponseError(
+                "Ollama request timed out after 80 seconds. "
+                "Model may be too slow or hung."
+            )
+        except requests.exceptions.ConnectionError:
+            raise AIResponseError(
+                "Cannot connect to Ollama at {self.ollama_url}. "
+                "Check if Ollama is running: 'ollama serve'"
+            )
+        except requests.exceptions.RequestException as e:
+            raise AIResponseError(f"HTTP request failed: {str(e)}")
+        except AIResponseError:
+            raise
         except Exception as e:
-            print(f"LLM generation error: {e}")
-        
-        # Fallback
-        return self._contextual_fallback(message, turn_count)
+            raise AIResponseError(f"Unexpected error generating AI response: {str(e)}")
     
     def _create_normal_prompt(self, message: str, context: str, turn_count: int) -> str:
+        """Create prompt for normal conversation"""
+        
         return f"""You are {self.victim_profile['name']}, a {self.victim_profile['age']}-year-old {self.victim_profile['occupation']} in India.
 
 PERSONALITY: {self.victim_profile['personality']}
@@ -157,9 +213,11 @@ YOUR APPROACH:
 - Be yourself - you're a normal person, not overly formal
 - Keep it conversational (2-3 sentences)
 
-Respond as Rajesh:"""
+Respond as Hardik:"""
 
     def _create_scam_prompt(self, message: str, context: str, turn_count: int, scam_type: str) -> str:
+        """Create prompt for scam conversation"""
+        
         return f"""You are {self.victim_profile['name']}, a {self.victim_profile['age']}-year-old {self.victim_profile['occupation']} in India.
 
 PERSONALITY: {self.victim_profile['personality']}
@@ -184,18 +242,20 @@ YOUR APPROACH:
 - Keep responses natural (2-4 sentences)
 
 CONVERSATION STAGE: Turn {turn_count + 1}
-- Early (1-3): Ask who they are, why they contacted you
+- Early (1-3): Ask who they are, why they contacted you. You can however ignore this stage ruleset if they chat in a non-financial casual way. Only start monitoring as soon as financial stuff is being discussed.
 - Mid (4-7): Show interest, ask for details about the process
 - Late (8+): Ask for specific details (their accounts, UPIs, links)
 
-Respond naturally as Rajesh:"""
+Respond naturally as Hardik:"""
     
     def _build_full_context(self, history: List[Dict]) -> str:
+        """Build conversation context"""
+        
         if not history:
             return "(Start of conversation)"
         
         lines = []
-        for msg in history[-8:]: 
+        for msg in history[-8:]:
             role = "You" if msg.get("role") == "agent" else "Them"
             content = msg.get("content", "")
             lines.append(f"{role}: {content}")
@@ -203,7 +263,9 @@ Respond naturally as Rajesh:"""
         return "\n".join(lines)
     
     def _minimal_clean(self, text: str) -> str:
-        text = re.sub(r'^(Response:|Victim:|Rajesh:|You:)\s*', '', text, flags=re.IGNORECASE)
+        """Clean AI response - minimal processing"""
+        
+        text = re.sub(r'^(Response:|Victim:|Hardik:|You:)\s*', '', text, flags=re.IGNORECASE)
         text = text.strip('"\'')
         text = text.strip()
         
@@ -212,56 +274,9 @@ Respond naturally as Rajesh:"""
         
         return text
     
-    def _contextual_fallback(self, message: str, turn_count: int) -> str:
-        
-        msg = message.lower()
-        
-        if any(w in msg for w in ['hello', 'hi', 'hey', 'good morning', 'good evening']):
-            return random.choice([
-                "Hello! How can I help you?",
-                "Hi there! What's this about?",
-                "Hey! Who is this?"
-            ])
-        
-        if '?' in message and not any(w in msg for w in ['bank', 'account', 'money', 'upi']):
-            return random.choice([
-                "That's an interesting question. What made you think of that?",
-                "Hmm, let me think about that. Why do you ask?",
-                "Good question! What's your take on it?"
-            ])
-        
-        if any(w in msg for w in ['bank', 'account', 'upi', 'payment', 'money']):
-            return "I have multiple accounts. Which one? And what's your account number so I can verify?"
-        
-        if any(w in msg for w in ['won', 'prize', 'winner', 'congratulations', 'offer']):
-            return "Really? That sounds great! How does this work exactly?"
-        
-        if any(w in msg for w in ['urgent', 'immediately', 'blocked', 'problem']):
-            return "Oh! What happened? Can you explain what's going on?"
-        
-        if any(w in msg for w in ['link', 'click', 'website', 'url']):
-            return "What link? Can you send it again? What website is it?"
-        
-        if turn_count <= 2:
-            return random.choice([
-                "I'm not sure I follow. Can you explain a bit more?",
-                "Interesting! Tell me more about this.",
-                "Okay, I'm listening. What's this about?"
-            ])
-        elif turn_count <= 5:
-            return random.choice([
-                "Alright, so what do I need to do exactly?",
-                "Got it. What's the next step?",
-                "Okay, can you walk me through the process?"
-            ])
-        else:
-            return random.choice([
-                "Can you give me your details so I can verify this?",
-                "What's your contact information?",
-                "Send me your account details first."
-            ])
-    
     def _get_conversation_stage(self, history: List[Dict]) -> int:
+        """Determine conversation stage"""
+        
         agent_turns = len([m for m in history if m.get("role") == "agent"])
         
         if agent_turns <= 1:

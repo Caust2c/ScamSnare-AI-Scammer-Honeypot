@@ -36,7 +36,6 @@ class IntelligenceDB:
             self._write_db(initial_data)
     
     def _read_db(self) -> Dict:
-        """Read database from file"""
         try:
             with open(self.db_file, 'r') as f:
                 return json.load(f)
@@ -45,7 +44,6 @@ class IntelligenceDB:
             return {}
     
     def _write_db(self, data: Dict):
-        """Write database to file"""
         try:
             with open(self.db_file, 'w') as f:
                 json.dump(data, f, indent=2)
@@ -61,10 +59,8 @@ class IntelligenceDB:
         messages: List[Dict],
         metrics: Dict
     ):
-        """Save a conversation and its extracted intelligence"""
         db = self._read_db()
         
-        # Save conversation details
         db["conversations"][conversation_id] = {
             "conversation_id": conversation_id,
             "timestamp": datetime.now().isoformat(),
@@ -76,7 +72,6 @@ class IntelligenceDB:
             "metrics": metrics
         }
         
-        # Aggregate intelligence (remove duplicates)
         for key in ["bank_accounts", "upi_ids", "phone_numbers", "urls", 
                     "ifsc_codes", "emails", "pan_cards", "aadhaar_numbers"]:
             if key in intelligence and intelligence[key]:
@@ -84,7 +79,6 @@ class IntelligenceDB:
                 new_items = set(intelligence[key])
                 db["all_intelligence"][key] = list(existing | new_items)
         
-        # Update statistics
         db["statistics"]["total_conversations"] = len(db["conversations"])
         db["statistics"]["total_scams_detected"] = sum(
             1 for conv in db["conversations"].values() 
@@ -98,20 +92,16 @@ class IntelligenceDB:
         self._write_db(db)
     
     def get_all_intelligence(self) -> Dict:
-        """Get all extracted intelligence"""
         db = self._read_db()
         return db.get("all_intelligence", {})
     
     def get_statistics(self) -> Dict:
-        """Get overall statistics"""
         db = self._read_db()
         return db.get("statistics", {})
     
     def get_conversations(self, limit: int = 50) -> List[Dict]:
-        """Get recent conversations"""
         db = self._read_db()
         conversations = list(db.get("conversations", {}).values())
-        # Sort by timestamp, most recent first
         conversations.sort(
             key=lambda x: x.get("timestamp", ""), 
             reverse=True
@@ -119,12 +109,10 @@ class IntelligenceDB:
         return conversations[:limit]
     
     def get_conversation(self, conversation_id: str) -> Dict:
-        """Get a specific conversation"""
         db = self._read_db()
         return db.get("conversations", {}).get(conversation_id, {})
     
     def export_intelligence(self, output_file: str = "intelligence_export.json"):
-        """Export all intelligence to a file"""
         db = self._read_db()
         
         export_data = {
@@ -140,11 +128,9 @@ class IntelligenceDB:
         return output_file
     
     def clear_database(self):
-        """Clear all data (use with caution!)"""
         self._ensure_db_exists()
     
     def get_high_value_intelligence(self) -> Dict:
-        """Get only high-value intelligence (bank accounts, UPIs, etc.)"""
         all_intel = self.get_all_intelligence()
         
         return {

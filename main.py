@@ -16,7 +16,7 @@ app = FastAPI(title="Agentic Honey-Pot API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
