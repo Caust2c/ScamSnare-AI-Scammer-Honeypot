@@ -11,7 +11,7 @@ class AIResponseError(Exception):
 class AgentEngine:
     def __init__(self, ollama_url="http://localhost:11434"):
         self.ollama_url = ollama_url
-        self.model = "llama3.2:3b"
+        self.model = "llama3.2:3b" #Change if different
         
         self.victim_profile = {
             "name": "Hardik Lalla",
