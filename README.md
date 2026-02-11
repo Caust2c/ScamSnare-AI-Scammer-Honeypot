@@ -10,7 +10,9 @@ ScamSnare is designed for cybersecurity research and defensive AI experimentatio
 During development, I realized that not everyone reaching out is a scammer. To handle this, I built two response styles: neutral and scam-specific. The bot can now distinguish between casual chat and actual threats, ensuring that genuine inquiries are handled with a low-threat, helpful tone.
 
 ##### Demo Video
-<video controls src="assets/demovid-00.00.00.000-00.00.25.756.mp4" title="Title"></video>
+https://github.com/user-attachments/assets/6caa75a5-449f-47e9-a837-a45bc5ac58ce
+
+
 
 #### Demo image
 ![alt text](assets/image.png)
