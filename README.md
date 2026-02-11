@@ -1,4 +1,13 @@
-# Project Setup and Run Guide
+# ScamSnare - An AI-Powered Adaptive Scam Honeypot
+
+## More about the project
+ScamSnare is an AI-powered honeypot built to interact with scam messages in a safe, controlled environment. It simulates a realistic victim persona using a locally hosted language model, allowing the system to study how scammers operate without putting real users at risk.
+
+The goal of the project is to analyze scam patterns, extract useful threat intelligence, and improve automated scam detection. It runs on a FastAPI backend that connects the AI agent, detection logic, and intelligence extraction pipeline into one system.
+
+ScamSnare is designed for cybersecurity research and defensive AI experimentation, providing a practical way to observe and understand modern social engineering tactics.
+
+---
 
 ## Prerequisites
 
@@ -21,8 +30,14 @@ Pull the required model:
 ```bash
 ollama pull llama3.2:3b
 ```
-You can use any other model as well
+You can use any other model as well but do change it in agent_engine.py
 Make sure Ollama is running before starting the backend server.
+
+---
+
+## Prompt modification
+
+You can modify the prompt in agent_engine.py. By default its set to have a believable persona, you can modify it entirely or just give a light personality change.
 
 ---
 
@@ -45,11 +60,6 @@ Start the backend using the provided shell script:
 ```bash
 bash shell.sh
 ```
-
-#### What `shell.sh` Does
-
-The shell script performs the following operations:
-
 ## Server URL
 
 Once started, the server runs at:

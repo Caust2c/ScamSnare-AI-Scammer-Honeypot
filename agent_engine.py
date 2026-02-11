@@ -4,7 +4,7 @@ from typing import List, Dict
 
 
 class AIResponseError(Exception):
-    """Raised when AI fails to generate a valid response"""
+    """Invalid AI response"""
     pass
 
 
@@ -44,7 +44,6 @@ class AgentEngine:
         
     
     async def _generate_simple_response(self, message: str) -> str:
-        """Generate simple AI response - no fallbacks"""
         
         prompt = f"""You are Hardik Lalla, a friendly 20-year-old engineering student in India.
 
@@ -52,8 +51,11 @@ Someone just sent you this message:
 "{message}"
 
 Respond naturally as yourself. Be friendly and conversational. Ask questions if you're curious or confused.
-
-Keep it short (1-2 sentences).
+YOUR GOAL (ACT LIKE A VICTIM):
+1. TAKE THE BAIT: Don't keep asking "who are you." Start believing them. 
+2. SHOW FOMO: Act worried about the deadline.
+3. BE TECH-CLUMSY: Act like you're trying to use the link or UPI but it's "not working" so they send more info.
+Keep it short.
 
 Your response:"""
 
@@ -107,7 +109,6 @@ Your response:"""
         history: List[Dict],
         scam_type: str
     ) -> str:
-        """Generate full AI response - no fallbacks, raises errors"""
         
         context = self._build_full_context(history)
         turn_count = len([m for m in history if m.get("role") == "agent"])
@@ -181,7 +182,7 @@ Your response:"""
             raise AIResponseError(f"Unexpected error generating AI response: {str(e)}")
     
     def _create_normal_prompt(self, message: str, context: str, turn_count: int) -> str:
-        """Create prompt for normal conversation"""
+        
         
         return f"""You are {self.victim_profile['name']}, a {self.victim_profile['age']}-year-old {self.victim_profile['occupation']} in India.
 
@@ -195,16 +196,18 @@ Conversation so far:
 
 They just said:
 "{message}"
-
+STYLE GUIDELINES:
+- NO PERFECT GRAMMAR. Use lowercase mostly.
+- Use casual fillers: "bro", "okay wait", "ohh", "umm", "thx", "pls".
 YOUR APPROACH:
 - Respond naturally and conversationally
 - Be friendly and helpful
-- Ask questions if you're curious or confused
 - Share appropriate information if asked
 - Show interest in what they're talking about
 - Use casual language (like "haha", "yeah", "okay", "actually")
 - Be yourself - you're a normal person, not overly formal
 - Keep it conversational (2-3 sentences)
+
 
 Respond as Hardik:"""
 
@@ -223,14 +226,15 @@ Conversation so far:
 Their latest message:
 "{message}"
 
+STYLE GUIDELINES:
+- NO PERFECT GRAMMAR. Use lowercase mostly.
+- Use casual fillers: "bro", "okay wait", "ohh", "umm", "thx", "pls".
 YOUR APPROACH:
 - Respond naturally as yourself
 - If they're offering something, show interest and ask HOW it works
-- If they need your information, ask WHY they need it first
 - If they ask for money/bank details, ask for THEIR details to "verify"
 - Try to get their information: account numbers, UPI IDs, phone numbers, links, company name
 - Show appropriate emotions (excitement, concern, confusion)
-- Never give away real bank details - deflect with questions
 - Be believable - you're curious but cautious
 - Keep responses natural (2-4 sentences)
 
@@ -242,7 +246,7 @@ CONVERSATION STAGE: Turn {turn_count + 1}
 Respond naturally as Hardik:"""
     
     def _build_full_context(self, history: List[Dict]) -> str:
-        """Build conversation context"""
+        """context"""
         
         if not history:
             return "(Start of conversation)"
@@ -256,7 +260,6 @@ Respond naturally as Hardik:"""
         return "\n".join(lines)
     
     def _minimal_clean(self, text: str) -> str:
-        """Clean AI response - minimal processing"""
         
         text = re.sub(r'^(Response:|Victim:|Hardik:|You:)\s*', '', text, flags=re.IGNORECASE)
         text = text.strip('"\'')
@@ -268,7 +271,6 @@ Respond naturally as Hardik:"""
         return text
     
     def _get_conversation_stage(self, history: List[Dict]) -> int:
-        """Determine conversation stage"""
         
         agent_turns = len([m for m in history if m.get("role") == "agent"])
         

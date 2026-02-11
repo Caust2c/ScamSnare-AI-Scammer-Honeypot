@@ -1,6 +1,6 @@
 
 
-API_KEY = "123456"  # API KEY, keep whatever
+API_KEY = "123456"  # API KEY, change and keep whatever
 API_HOST = "0.0.0.0"
 API_PORT = 8000
 OLLAMA_URL = "http://localhost:11434"
