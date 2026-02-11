@@ -7,8 +7,13 @@ The goal of the project is to analyze scam patterns, extract useful threat intel
 
 ScamSnare is designed for cybersecurity research and defensive AI experimentation, providing a practical way to observe and understand modern social engineering tactics.
 
-![demo](image.png)
+During development, I realized that not everyone reaching out is a scammer. To handle this, I built two response styles: neutral and scam-specific. The bot can now distinguish between casual chat and actual threats, ensuring that genuine inquiries are handled with a low-threat, helpful tone.
 
+##### Demo Video
+<video controls src="assets/demovid-00.00.00.000-00.00.25.756.mp4" title="Title"></video>
+
+#### Demo image
+![alt text](assets/image.png)
 ---
 
 ## Prerequisites
