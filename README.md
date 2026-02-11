@@ -6,6 +6,7 @@ ScamSnare is a basic AI-powered honeypot built to interact with scam messages in
 The goal of the project is to analyze scam patterns, extract useful threat intelligence, and improve automated scam detection. It runs on a FastAPI backend that connects the AI agent, detection logic, and intelligence extraction pipeline into one system.
 
 ScamSnare is designed for cybersecurity research and defensive AI experimentation, providing a practical way to observe and understand modern social engineering tactics.
+
 ![demo](image.png)
 
 ---
