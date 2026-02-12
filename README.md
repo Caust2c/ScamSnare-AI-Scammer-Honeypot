@@ -65,6 +65,7 @@ Set your API key inside `config.py`. Also update the API key in the frontend scr
 ### 3. Run the Server
 
 Start the backend using the provided shell script:
+
 Note - Shell.sh was written for linux, but its windows equivalent is simple.
 
 ```bash
