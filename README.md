@@ -93,4 +93,8 @@ FastAPI automatically provides interactive API documentation at:
 http://localhost:8000/docs
 ```
 
-Visit this URL in your browser to explore and test all available API endpoints.
+Visit this URL in your browser to explore and test all available API endpoints
+
+## Future Development Roadmap
+- Docker containerization for simplified deployment
+- Support for external LLM APIs (Gemini, OpenAI, etc.) in addition to local Ollama
